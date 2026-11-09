@@ -113,7 +113,9 @@ O Docker Compose irá:
 
 ### 2. Acessar o sistema
 Abra no navegador:
-👉 **[http://localhost:3000](http://localhost:3000)**
+👉 **[http://localhost:3333](http://localhost:3333)**
+
+*(Portas configuradas: **3333** para a aplicação web e **5433** para acesso externo ao banco PostgreSQL).*
 
 ### 3. Credenciais de Acesso Padrão
 
@@ -220,7 +222,9 @@ No menu **Environment Variables** do Coolify, adicione:
 
 ```env
 NODE_ENV=production
-PORT=3000
+PORT=3333
+APP_PORT=3333
+DB_PORT=5433
 POSTGRES_USER=app_user
 POSTGRES_PASSWORD=gere_uma_senha_muito_segura_aqui
 POSTGRES_DB=mini_gestao
@@ -233,7 +237,7 @@ COOKIE_SECURE=true
 
 ### Passo 4: Configurar Domínio e HTTPS
 1. No campo **Domains** do serviço `app`, informe seu domínio completo (ex: `https://gestao.seudominio.com.br`).
-2. Defina a porta de destino como `3000`.
+2. Defina a porta de destino como `3333`.
 3. O Coolify configura automaticamente o certificado HTTPS gratuito com Let's Encrypt através do Traefik.
 
 ### Passo 5: Executar o Deploy

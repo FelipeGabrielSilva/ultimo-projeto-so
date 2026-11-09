@@ -155,8 +155,136 @@ async function initCurrentUser() {
     }
 
     window.CURRENT_USER = user;
+    ensureProfileModal();
   } catch (err) {
     console.warn('Não foi possível obter usuário atual:', err.message);
+  }
+}
+
+// Criação e controle dinâmico do Modal de Meu Perfil
+function ensureProfileModal() {
+  if (document.getElementById('profileModal')) return;
+
+  const modalHtml = `
+  <div class="modal fade" id="profileModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <form id="profileForm">
+          <div class="modal-header">
+            <h5 class="modal-title fw-bold"><i class="bi bi-person-circle me-2"></i>Meu Perfil</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+          </div>
+          <div class="modal-body">
+            <div id="profileModalAlert" class="alert alert-danger d-none py-2 px-3 small mb-3"></div>
+            
+            <div class="mb-3">
+              <label for="profileEmail" class="form-label small fw-semibold">E-mail</label>
+              <input type="text" class="form-control bg-light" id="profileEmail" disabled readonly>
+            </div>
+
+            <div class="mb-3">
+              <label for="profileName" class="form-label small fw-semibold">Nome Completo *</label>
+              <input type="text" class="form-control" id="profileName" required>
+            </div>
+
+            <hr class="my-3 text-muted">
+            <h6 class="fw-semibold small text-muted text-uppercase mb-2">Alterar Senha (Opcional)</h6>
+
+            <div class="mb-3">
+              <label for="profileCurrentPassword" class="form-label small fw-semibold">Senha Atual</label>
+              <input type="password" class="form-control" id="profileCurrentPassword" placeholder="••••••••">
+            </div>
+
+            <div class="mb-3">
+              <label for="profileNewPassword" class="form-label small fw-semibold">Nova Senha</label>
+              <input type="password" class="form-control" id="profileNewPassword" placeholder="••••••••">
+              <div class="form-text small">Mínimo de 6 caracteres. Deixe em branco se não desejar alterar.</div>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+            <button type="submit" class="btn btn-primary" id="btnSaveProfile">
+              <i class="bi bi-check-lg me-1"></i>Salvar Alterações
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>`;
+
+  const container = document.createElement('div');
+  container.innerHTML = modalHtml;
+  document.body.appendChild(container.firstElementChild);
+
+  document.getElementById('profileForm').addEventListener('submit', handleSaveProfile);
+
+  // Vincular clique no perfil do usuário na sidebar
+  document.querySelectorAll('.user-profile').forEach((el) => {
+    el.setAttribute('title', 'Clique para editar seu perfil');
+    el.addEventListener('click', openProfileModal);
+  });
+}
+
+function openProfileModal() {
+  if (!window.CURRENT_USER) return;
+  setModalAlert('profileModalAlert', '');
+  document.getElementById('profileEmail').value = window.CURRENT_USER.email || '';
+  document.getElementById('profileName').value = window.CURRENT_USER.name || '';
+  document.getElementById('profileCurrentPassword').value = '';
+  document.getElementById('profileNewPassword').value = '';
+  showModal('profileModal');
+}
+
+async function handleSaveProfile(e) {
+  e.preventDefault();
+  setModalAlert('profileModalAlert', '');
+
+  const name = document.getElementById('profileName').value.trim();
+  const currentPassword = document.getElementById('profileCurrentPassword').value;
+  const newPassword = document.getElementById('profileNewPassword').value;
+
+  if (!name) {
+    setModalAlert('profileModalAlert', 'O nome é obrigatório.');
+    return;
+  }
+
+  const payload = { name };
+  if (newPassword && newPassword.trim().length > 0) {
+    payload.currentPassword = currentPassword;
+    payload.newPassword = newPassword;
+  }
+
+  const submitBtn = document.getElementById('btnSaveProfile');
+  submitBtn.disabled = true;
+  submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Salvando...';
+
+  try {
+    const res = await fetchApi('/api/auth/profile', {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    });
+
+    showToast('Perfil atualizado com sucesso!', 'success');
+    hideModal('profileModal');
+
+    // Atualiza nome e avatar na interface
+    if (res.user) {
+      window.CURRENT_USER.name = res.user.name;
+      document.querySelectorAll('.current-user-name').forEach((el) => (el.textContent = res.user.name));
+      const initials = res.user.name
+        .split(' ')
+        .slice(0, 2)
+        .map((n) => n[0])
+        .join('')
+        .toUpperCase();
+      document.querySelectorAll('.avatar-circle').forEach((el) => (el.textContent = initials || 'U'));
+    }
+  } catch (err) {
+    setModalAlert('profileModalAlert', err.message);
+    showToast(err.message, 'danger');
+  } finally {
+    submitBtn.disabled = false;
+    submitBtn.innerHTML = '<i class="bi bi-check-lg me-1"></i>Salvar Alterações';
   }
 }
 

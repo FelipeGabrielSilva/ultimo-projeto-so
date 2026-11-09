@@ -20,7 +20,7 @@ COPY . .
 USER node
 
 # Expor a porta padrão da aplicação
-EXPOSE 3000
+EXPOSE 3333
 
 # Comando para inicializar o servidor
 CMD ["node", "src/server.js"]

@@ -5,10 +5,10 @@ services:
       dockerfile: Dockerfile
     restart: unless-stopped
     ports:
-      - "${APP_PORT:-3000}:3000"
+      - "${APP_PORT:-3333}:3333"
     environment:
       - NODE_ENV=${NODE_ENV:-production}
-      - PORT=3000
+      - PORT=${PORT:-3333}
       - DATABASE_URL=${DATABASE_URL:-postgresql://${POSTGRES_USER:-app_user}:${POSTGRES_PASSWORD:-senha_segura_123}@database:5432/${POSTGRES_DB:-mini_gestao}}
       - SESSION_SECRET=${SESSION_SECRET:-chave_secreta_padrao_substitua_em_producao_928374}
       - SESSION_MAX_AGE=${SESSION_MAX_AGE:-86400000}
@@ -22,6 +22,8 @@ services:
   database:
     image: postgres:16-alpine
     restart: unless-stopped
+    ports:
+      - "${DB_PORT:-5433}:5432"
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-app_user}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-senha_segura_123}

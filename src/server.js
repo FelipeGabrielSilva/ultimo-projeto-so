@@ -4,7 +4,7 @@ const path = require('path');
 const app = require('./app');
 const { pool } = require('./config/database');
 
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 3333;
 
 /**
  * Tenta conectar ao banco de dados com repetições automáticas (essencial para ambientes em nuvem / Coolify)
