@@ -18,3 +18,4 @@ docker exec -t mini_gestao_db pg_dump -U app_user -d mini_gestao > "$TARGET_PATH
 echo "✅ Backup realizado com sucesso!"
 echo "📁 Arquivo salvo em: $TARGET_PATH"
 ls -lh "$TARGET_PATH"
+

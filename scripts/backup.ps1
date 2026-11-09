@@ -1,4 +1,4 @@
-﻿# ========================================================
+# ========================================================
 # Script de Backup do Banco de Dados PostgreSQL (Windows)
 # ========================================================
 
@@ -22,3 +22,4 @@ if (Test-Path $targetPath) {
 } else {
     Write-Host "❌ Falha ao criar o arquivo de backup." -ForegroundColor Red
 }
+

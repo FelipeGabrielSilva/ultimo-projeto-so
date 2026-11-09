@@ -75,9 +75,14 @@
           </button>
           <h4 class="mb-0 fw-bold">Gerenciamento de Tarefas</h4>
         </div>
-        <button class="btn btn-primary" onclick="openCreateTask()">
-          <i class="bi bi-plus-circle me-1"></i>Nova Tarefa
-        </button>
+        <div class="d-flex align-items-center gap-2">
+          <button class="btn btn-outline-secondary" onclick="exportTasksToCSV()" title="Exportar Tarefas para CSV">
+            <i class="bi bi-file-earmark-spreadsheet me-1"></i>Exportar CSV
+          </button>
+          <button class="btn btn-primary" onclick="openCreateTask()">
+            <i class="bi bi-plus-circle me-1"></i>Nova Tarefa
+          </button>
+        </div>
       </header>
 
       <main class="content-body">

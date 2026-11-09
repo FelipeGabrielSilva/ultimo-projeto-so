@@ -269,7 +269,34 @@ function escapeHtml(str) {
     .replace(/'/g, '&#039;');
 }
 
+function exportClientsToCSV() {
+  if (clientsMap.size === 0) {
+    showToast('Nenhum cliente disponível para exportação.', 'warning');
+    return;
+  }
+  const headers = ['ID', 'Nome', 'CPF_CNPJ', 'Email', 'Telefone', 'Situacao', 'Total_Tarefas'];
+  const rows = Array.from(clientsMap.values()).map((c) => [
+    c.id,
+    `"${(c.name || '').replace(/"/g, '""')}"`,
+    `"${(c.document || '').replace(/"/g, '""')}"`,
+    `"${(c.email || '').replace(/"/g, '""')}"`,
+    `"${(c.phone || '').replace(/"/g, '""')}"`,
+    c.status === 'active' ? 'Ativo' : 'Inativo',
+    c.total_tasks || 0,
+  ]);
+  const csvContent = '\uFEFF' + [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `clientes_${new Date().toISOString().slice(0, 10)}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+  showToast('Planilha CSV de clientes exportada!', 'success');
+}
+
 // Exportações explícitas no window para suporte total a chamadas de botões
 window.openCreateClient = openCreateClient;
 window.openEditClient = openEditClient;
 window.openDeleteClient = openDeleteClient;
+window.exportClientsToCSV = exportClientsToCSV;

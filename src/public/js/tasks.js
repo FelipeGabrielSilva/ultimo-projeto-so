@@ -387,6 +387,33 @@ function escapeHtml(str) {
     .replace(/'/g, '&#039;');
 }
 
+function exportTasksToCSV() {
+  if (tasksMap.size === 0) {
+    showToast('Nenhuma tarefa disponível para exportação.', 'warning');
+    return;
+  }
+  const headers = ['ID', 'Titulo', 'Cliente', 'Responsavel', 'Situacao', 'Prazo', 'Descricao'];
+  const rows = Array.from(tasksMap.values()).map((t) => [
+    t.id,
+    `"${(t.title || '').replace(/"/g, '""')}"`,
+    `"${(t.client_name || '').replace(/"/g, '""')}"`,
+    `"${(t.user_name || '').replace(/"/g, '""')}"`,
+    t.status,
+    t.due_date || '',
+    `"${(t.description || '').replace(/"/g, '""')}"`,
+  ]);
+  const csvContent = '\uFEFF' + [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `tarefas_${new Date().toISOString().slice(0, 10)}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+  showToast('Planilha CSV de tarefas exportada!', 'success');
+}
+
 window.openCreateTask = openCreateTask;
 window.openEditTask = openEditTask;
 window.openDeleteTask = openDeleteTask;
+window.exportTasksToCSV = exportTasksToCSV;

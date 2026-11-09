@@ -75,9 +75,14 @@
           </button>
           <h4 class="mb-0 fw-bold">Gerenciamento de Clientes</h4>
         </div>
-        <button class="btn btn-primary" onclick="openCreateClient()">
-          <i class="bi bi-person-plus me-1"></i>Novo Cliente
-        </button>
+        <div class="d-flex align-items-center gap-2">
+          <button class="btn btn-outline-secondary" onclick="exportClientsToCSV()" title="Exportar Clientes para CSV">
+            <i class="bi bi-file-earmark-spreadsheet me-1"></i>Exportar CSV
+          </button>
+          <button class="btn btn-primary" onclick="openCreateClient()">
+            <i class="bi bi-person-plus me-1"></i>Novo Cliente
+          </button>
+        </div>
       </header>
 
       <main class="content-body">

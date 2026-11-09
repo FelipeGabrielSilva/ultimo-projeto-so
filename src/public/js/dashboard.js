@@ -21,6 +21,9 @@ async function loadDashboardData() {
 
     // Renderizar Tarefas Próximas do Vencimento
     renderDueSoonTasks(data.dueSoonTasks || []);
+
+    // Renderizar Gráficos Visuais (Chart.js)
+    renderCharts(data);
   } catch (err) {
     console.error('Erro ao carregar dados do dashboard:', err);
     showToast('Falha ao carregar indicadores do dashboard.', 'danger');
@@ -133,5 +136,103 @@ function escapeHtml(str) {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#039;');
+}
+
+let statusChart = null;
+let overviewChart = null;
+
+function renderCharts(data) {
+  if (typeof Chart === 'undefined') return;
+
+  // 1. Gráfico de Rosca (Status das Tarefas)
+  const statusCanvas = document.getElementById('tasksStatusChart');
+  if (statusCanvas) {
+    if (statusChart) statusChart.destroy();
+
+    const pending = data.pendingTasks || 0;
+    const inProgress = data.inProgressTasks || 0;
+    const completed = data.completedTasks || 0;
+    const cancelled = data.cancelledTasks || 0;
+
+    statusChart = new Chart(statusCanvas, {
+      type: 'doughnut',
+      data: {
+        labels: ['Pendentes', 'Em Andamento', 'Concluídas', 'Canceladas'],
+        datasets: [
+          {
+            data: [pending, inProgress, completed, cancelled],
+            backgroundColor: ['#f59e0b', '#0284c7', '#10b981', '#94a3b8'],
+            borderWidth: 2,
+            borderColor: '#ffffff',
+          },
+        ],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: {
+            position: 'bottom',
+            labels: {
+              boxWidth: 12,
+              padding: 15,
+            },
+          },
+        },
+        cutout: '65%',
+      },
+    });
+  }
+
+  // 2. Gráfico de Barras (Visão Geral do Sistema)
+  const overviewCanvas = document.getElementById('systemOverviewChart');
+  if (overviewCanvas) {
+    if (overviewChart) overviewChart.destroy();
+
+    const totalClients = data.totalClients || 0;
+    const totalTasks = data.totalTasks || 0;
+    const openTasks = (data.pendingTasks || 0) + (data.inProgressTasks || 0);
+    const completed = data.completedTasks || 0;
+
+    overviewChart = new Chart(overviewCanvas, {
+      type: 'bar',
+      data: {
+        labels: ['Clientes', 'Total Tarefas', 'Tarefas Abertas', 'Concluídas'],
+        datasets: [
+          {
+            label: 'Quantidade',
+            data: [totalClients, totalTasks, openTasks, completed],
+            backgroundColor: ['#6366f1', '#0ea5e9', '#f59e0b', '#10b981'],
+            borderRadius: 6,
+          },
+        ],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: {
+            display: false,
+          },
+        },
+        scales: {
+          y: {
+            beginAtZero: true,
+            ticks: {
+              stepSize: 1,
+            },
+            grid: {
+              color: '#f1f5f9',
+            },
+          },
+          x: {
+            grid: {
+              display: false,
+            },
+          },
+        },
+      },
+    });
+  }
 }
 

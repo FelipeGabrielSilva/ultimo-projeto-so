@@ -30,3 +30,4 @@ echo "📥 Restaurando banco de dados a partir de $BACKUP_FILE..."
 cat "$BACKUP_FILE" | docker exec -i mini_gestao_db psql -U app_user -d mini_gestao
 
 echo "✅ Restauração finalizada com sucesso!"
+
