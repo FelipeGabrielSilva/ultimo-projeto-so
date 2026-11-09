@@ -43,6 +43,47 @@ function showToast(message, type = 'success') {
   });
 }
 
+// Helper seguro para fechar modais do Bootstrap e remover backdrops presos
+function hideModal(modalId) {
+  const el = document.getElementById(modalId);
+  if (!el) return;
+  const instance = bootstrap.Modal.getInstance(el) || bootstrap.Modal.getOrCreateInstance(el);
+  if (instance) {
+    instance.hide();
+  }
+  // Limpeza de segurança para evitar páginas travadas por backdrops órfãos
+  setTimeout(() => {
+    if (!document.querySelector('.modal.show')) {
+      document.querySelectorAll('.modal-backdrop').forEach((b) => b.remove());
+      document.body.classList.remove('modal-open');
+      document.body.style.removeProperty('overflow');
+      document.body.style.removeProperty('padding-right');
+    }
+  }, 350);
+}
+
+// Helper para abrir modais de forma garantida
+function showModal(modalId) {
+  const el = document.getElementById(modalId);
+  if (!el) return null;
+  const instance = bootstrap.Modal.getOrCreateInstance(el);
+  instance.show();
+  return instance;
+}
+
+// Helper para exibir mensagens de erro dentro do próprio modal
+function setModalAlert(alertId, message) {
+  const el = document.getElementById(alertId);
+  if (!el) return;
+  if (message) {
+    el.textContent = message;
+    el.classList.remove('d-none');
+  } else {
+    el.textContent = '';
+    el.classList.add('d-none');
+  }
+}
+
 // Wrapper centralizado de chamadas de API com tratamento de sessão
 async function fetchApi(url, options = {}) {
   const defaultHeaders = {

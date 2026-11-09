@@ -142,6 +142,34 @@
           </div>
         </div>
 
+        <!-- Linha de Gráficos Visuais -->
+        <div class="row g-4 mb-4">
+          <div class="col-12 col-lg-6">
+            <div class="card h-100">
+              <div class="card-header bg-white py-3">
+                <h6 class="card-title mb-0 fw-bold">
+                  <i class="bi bi-pie-chart me-2 text-primary"></i>Distribuição por Status
+                </h6>
+              </div>
+              <div class="card-body d-flex align-items-center justify-content-center" style="min-height: 260px;">
+                <canvas id="tasksStatusChart" style="max-height: 240px;"></canvas>
+              </div>
+            </div>
+          </div>
+          <div class="col-12 col-lg-6">
+            <div class="card h-100">
+              <div class="card-header bg-white py-3">
+                <h6 class="card-title mb-0 fw-bold">
+                  <i class="bi bi-bar-chart-line me-2 text-info"></i>Visão Geral do Sistema
+                </h6>
+              </div>
+              <div class="card-body d-flex align-items-center justify-content-center" style="min-height: 260px;">
+                <canvas id="systemOverviewChart" style="max-height: 240px;"></canvas>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <!-- Tabelas de Acompanhamento -->
         <div class="row g-4">
           <!-- Últimas Tarefas Cadastradas -->

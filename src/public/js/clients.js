@@ -2,14 +2,10 @@
  * Mini Gestão - Gerenciamento de Clientes
  */
 
-let clientsModal;
-let deleteModal;
+const clientsMap = new Map();
 let clientToDeleteId = null;
 
 document.addEventListener('DOMContentLoaded', () => {
-  clientsModal = new bootstrap.Modal(document.getElementById('clientModal'));
-  deleteModal = new bootstrap.Modal(document.getElementById('deleteConfirmModal'));
-
   loadClients();
 
   // Busca e Filtros
@@ -17,27 +13,59 @@ document.addEventListener('DOMContentLoaded', () => {
   const statusFilter = document.getElementById('filterClientStatus');
 
   let debounceTimer;
-  searchInput.addEventListener('input', () => {
-    clearTimeout(debounceTimer);
-    debounceTimer = setTimeout(() => loadClients(), 300);
-  });
+  if (searchInput) {
+    searchInput.addEventListener('input', () => {
+      clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => loadClients(), 300);
+    });
+  }
 
-  statusFilter.addEventListener('change', () => {
-    loadClients();
-  });
+  if (statusFilter) {
+    statusFilter.addEventListener('change', () => {
+      loadClients();
+    });
+  }
 
   // Formulário de Criação/Edição
-  document.getElementById('clientForm').addEventListener('submit', handleSaveClient);
+  const clientForm = document.getElementById('clientForm');
+  if (clientForm) {
+    clientForm.addEventListener('submit', handleSaveClient);
+  }
 
-  // Confirmação de exclusão
-  document.getElementById('btnConfirmDelete').addEventListener('click', handleConfirmDelete);
+  // Botão de Confirmação de Exclusão no Modal
+  const btnConfirmDelete = document.getElementById('btnConfirmDelete');
+  if (btnConfirmDelete) {
+    btnConfirmDelete.addEventListener('click', handleConfirmDelete);
+  }
+
+  // Delegação de Eventos na Tabela (garante clique mesmo se clicar no ícone <i> dentro do botão)
+  const tbody = document.getElementById('clientsTableBody');
+  if (tbody) {
+    tbody.addEventListener('click', (e) => {
+      const btn = e.target.closest('button');
+      if (!btn) return;
+
+      const action = btn.dataset.action;
+      const id = parseInt(btn.dataset.id, 10);
+
+      if (action === 'edit' && id) {
+        openEditClient(id);
+      } else if (action === 'delete' && id) {
+        openDeleteClient(id);
+      }
+    });
+  }
 });
 
 async function loadClients() {
-  const search = document.getElementById('searchClientInput').value.trim();
-  const status = document.getElementById('filterClientStatus').value;
+  const searchInput = document.getElementById('searchClientInput');
+  const statusFilter = document.getElementById('filterClientStatus');
+  const search = searchInput ? searchInput.value.trim() : '';
+  const status = statusFilter ? statusFilter.value : 'all';
 
   const tbody = document.getElementById('clientsTableBody');
+  if (!tbody) return;
+
   tbody.innerHTML = `
     <tr>
       <td colspan="7" class="text-center py-4 text-muted">
@@ -50,11 +78,12 @@ async function loadClients() {
   try {
     const params = new URLSearchParams();
     if (search) params.append('search', search);
-    if (status) params.append('status', status);
+    if (status && status !== 'all') params.append('status', status);
 
     const clients = await fetchApi(`/api/clients?${params.toString()}`);
+    clientsMap.clear();
 
-    if (clients.length === 0) {
+    if (!Array.isArray(clients) || clients.length === 0) {
       tbody.innerHTML = `
         <tr>
           <td colspan="7" class="text-center py-4 text-muted">
@@ -65,6 +94,9 @@ async function loadClients() {
       `;
       return;
     }
+
+    // Armazena no mapa para acesso rápido e seguro
+    clients.forEach((c) => clientsMap.set(c.id, c));
 
     tbody.innerHTML = clients
       .map(
@@ -81,16 +113,16 @@ async function loadClients() {
         </td>
         <td>
           <span class="badge bg-light text-dark border">
-            ${c.total_tasks} tarefa(s)
+            ${c.total_tasks || 0} tarefa(s)
           </span>
           ${c.open_tasks > 0 ? `<span class="badge bg-warning text-dark ms-1">${c.open_tasks} aberta(s)</span>` : ''}
         </td>
         <td class="text-end">
-          <button class="btn btn-sm btn-outline-primary me-1" onclick="openEditClient(${c.id})" title="Editar">
-            <i class="bi bi-pencil"></i>
+          <button type="button" class="btn btn-sm btn-outline-primary me-1" data-action="edit" data-id="${c.id}" title="Editar">
+            <i class="bi bi-pencil pointer-events-none"></i>
           </button>
-          <button class="btn btn-sm btn-outline-danger" onclick="openDeleteClient(${c.id}, '${escapeHtml(c.name)}')" title="Excluir">
-            <i class="bi bi-trash"></i>
+          <button type="button" class="btn btn-sm btn-outline-danger" data-action="delete" data-id="${c.id}" title="Excluir">
+            <i class="bi bi-trash pointer-events-none"></i>
           </button>
         </td>
       </tr>
@@ -111,16 +143,22 @@ async function loadClients() {
 }
 
 function openCreateClient() {
+  setModalAlert('clientModalAlert', '');
   document.getElementById('clientModalLabel').textContent = 'Novo Cliente';
   document.getElementById('clientId').value = '';
   document.getElementById('clientForm').reset();
   document.getElementById('clientStatus').value = 'active';
-  clientsModal.show();
+  showModal('clientModal');
 }
 
 async function openEditClient(id) {
+  setModalAlert('clientModalAlert', '');
   try {
-    const client = await fetchApi(`/api/clients/${id}`);
+    let client = clientsMap.get(id);
+    if (!client) {
+      client = await fetchApi(`/api/clients/${id}`);
+    }
+
     document.getElementById('clientModalLabel').textContent = 'Editar Cliente';
     document.getElementById('clientId').value = client.id;
     document.getElementById('clientName').value = client.name || '';
@@ -128,20 +166,28 @@ async function openEditClient(id) {
     document.getElementById('clientPhone').value = client.phone || '';
     document.getElementById('clientDocument').value = client.document || '';
     document.getElementById('clientStatus').value = client.status || 'active';
-    clientsModal.show();
+
+    showModal('clientModal');
   } catch (err) {
-    showToast('Erro ao buscar dados do cliente: ' + err.message, 'danger');
+    showToast('Erro ao carregar dados do cliente: ' + err.message, 'danger');
   }
 }
 
 async function handleSaveClient(e) {
   e.preventDefault();
+  setModalAlert('clientModalAlert', '');
+
   const id = document.getElementById('clientId').value;
   const name = document.getElementById('clientName').value.trim();
   const email = document.getElementById('clientEmail').value.trim();
   const phone = document.getElementById('clientPhone').value.trim();
   const documentNum = document.getElementById('clientDocument').value.trim();
   const status = document.getElementById('clientStatus').value;
+
+  if (!name) {
+    setModalAlert('clientModalAlert', 'O nome do cliente é obrigatório.');
+    return;
+  }
 
   const payload = { name, email, phone, document: documentNum, status };
   const submitBtn = document.getElementById('btnSaveClient');
@@ -163,9 +209,10 @@ async function handleSaveClient(e) {
       showToast('Cliente cadastrado com sucesso!', 'success');
     }
 
-    clientsModal.hide();
+    hideModal('clientModal');
     loadClients();
   } catch (err) {
+    setModalAlert('clientModalAlert', err.message);
     showToast(err.message, 'danger');
   } finally {
     submitBtn.disabled = false;
@@ -173,15 +220,23 @@ async function handleSaveClient(e) {
   }
 }
 
-function openDeleteClient(id, name) {
+function openDeleteClient(id) {
   clientToDeleteId = id;
-  document.getElementById('deleteClientName').textContent = name;
-  deleteModal.show();
+  setModalAlert('deleteClientAlert', '');
+
+  const client = clientsMap.get(id);
+  const name = client ? client.name : `#${id}`;
+
+  const nameEl = document.getElementById('deleteClientName');
+  if (nameEl) nameEl.textContent = name;
+
+  showModal('deleteConfirmModal');
 }
 
 async function handleConfirmDelete() {
   if (!clientToDeleteId) return;
 
+  setModalAlert('deleteClientAlert', '');
   const btn = document.getElementById('btnConfirmDelete');
   btn.disabled = true;
   btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Excluindo...';
@@ -192,14 +247,15 @@ async function handleConfirmDelete() {
     });
 
     showToast('Cliente excluído com sucesso.', 'success');
-    deleteModal.hide();
+    hideModal('deleteConfirmModal');
+    clientToDeleteId = null;
     loadClients();
   } catch (err) {
+    setModalAlert('deleteClientAlert', err.message);
     showToast(err.message, 'danger');
   } finally {
     btn.disabled = false;
     btn.innerHTML = 'Excluir Cliente';
-    clientToDeleteId = null;
   }
 }
 
@@ -213,3 +269,7 @@ function escapeHtml(str) {
     .replace(/'/g, '&#039;');
 }
 
+// Exportações explícitas no window para suporte total a chamadas de botões
+window.openCreateClient = openCreateClient;
+window.openEditClient = openEditClient;
+window.openDeleteClient = openDeleteClient;

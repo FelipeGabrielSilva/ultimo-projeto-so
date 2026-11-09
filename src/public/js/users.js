@@ -2,25 +2,47 @@
  * Mini Gestão - Gerenciamento de Usuários (Administrativo)
  */
 
-let userModal;
-let deleteUserModal;
+const usersMap = new Map();
 let userToDeleteId = null;
 
 document.addEventListener('DOMContentLoaded', () => {
-  userModal = new bootstrap.Modal(document.getElementById('userModal'));
-  deleteUserModal = new bootstrap.Modal(document.getElementById('deleteUserConfirmModal'));
-
   loadUsers();
 
   // Formulário de Criação/Edição
-  document.getElementById('userForm').addEventListener('submit', handleSaveUser);
+  const userForm = document.getElementById('userForm');
+  if (userForm) {
+    userForm.addEventListener('submit', handleSaveUser);
+  }
 
   // Confirmação de exclusão
-  document.getElementById('btnConfirmDeleteUser').addEventListener('click', handleConfirmDeleteUser);
+  const btnConfirmDeleteUser = document.getElementById('btnConfirmDeleteUser');
+  if (btnConfirmDeleteUser) {
+    btnConfirmDeleteUser.addEventListener('click', handleConfirmDeleteUser);
+  }
+
+  // Delegação de Eventos na Tabela
+  const tbody = document.getElementById('usersTableBody');
+  if (tbody) {
+    tbody.addEventListener('click', (e) => {
+      const btn = e.target.closest('button');
+      if (!btn) return;
+
+      const action = btn.dataset.action;
+      const id = parseInt(btn.dataset.id, 10);
+
+      if (action === 'edit' && id) {
+        openEditUser(id);
+      } else if (action === 'delete' && id) {
+        openDeleteUser(id);
+      }
+    });
+  }
 });
 
 async function loadUsers() {
   const tbody = document.getElementById('usersTableBody');
+  if (!tbody) return;
+
   tbody.innerHTML = `
     <tr>
       <td colspan="6" class="text-center py-4 text-muted">
@@ -32,8 +54,9 @@ async function loadUsers() {
 
   try {
     const users = await fetchApi('/api/users');
+    usersMap.clear();
 
-    if (users.length === 0) {
+    if (!Array.isArray(users) || users.length === 0) {
       tbody.innerHTML = `
         <tr>
           <td colspan="6" class="text-center py-4 text-muted">
@@ -44,6 +67,8 @@ async function loadUsers() {
       `;
       return;
     }
+
+    users.forEach((u) => usersMap.set(u.id, u));
 
     tbody.innerHTML = users
       .map(
@@ -66,15 +91,17 @@ async function loadUsers() {
         </td>
         <td class="text-muted small">${new Date(u.created_at).toLocaleDateString('pt-BR')}</td>
         <td class="text-end">
-          <button class="btn btn-sm btn-outline-primary me-1" onclick="openEditUser(${u.id})" title="Editar">
-            <i class="bi bi-pencil"></i>
+          <button type="button" class="btn btn-sm btn-outline-primary me-1" data-action="edit" data-id="${u.id}" title="Editar">
+            <i class="bi bi-pencil pointer-events-none"></i>
           </button>
           <button 
+            type="button"
             class="btn btn-sm btn-outline-danger" 
-            onclick="openDeleteUser(${u.id}, '${escapeHtml(u.name)}')" 
+            data-action="delete"
+            data-id="${u.id}"
             ${window.CURRENT_USER && window.CURRENT_USER.id === u.id ? 'disabled title="Você não pode excluir a si mesmo"' : 'title="Excluir"'}
           >
-            <i class="bi bi-trash"></i>
+            <i class="bi bi-trash pointer-events-none"></i>
           </button>
         </td>
       </tr>
@@ -95,6 +122,7 @@ async function loadUsers() {
 }
 
 function openCreateUser() {
+  setModalAlert('userModalAlert', '');
   document.getElementById('userModalLabel').textContent = 'Novo Usuário';
   document.getElementById('userId').value = '';
   document.getElementById('userForm').reset();
@@ -102,12 +130,17 @@ function openCreateUser() {
   document.getElementById('passwordHelpText').textContent = 'Mínimo de 6 caracteres.';
   document.getElementById('userRole').value = 'user';
   document.getElementById('userActive').checked = true;
-  userModal.show();
+  showModal('userModal');
 }
 
 async function openEditUser(id) {
+  setModalAlert('userModalAlert', '');
   try {
-    const user = await fetchApi(`/api/users/${id}`);
+    let user = usersMap.get(id);
+    if (!user) {
+      user = await fetchApi(`/api/users/${id}`);
+    }
+
     document.getElementById('userModalLabel').textContent = 'Editar Usuário';
     document.getElementById('userId').value = user.id;
     document.getElementById('userName').value = user.name || '';
@@ -117,7 +150,8 @@ async function openEditUser(id) {
     document.getElementById('passwordHelpText').textContent = 'Deixe em branco para manter a senha atual.';
     document.getElementById('userRole').value = user.role || 'user';
     document.getElementById('userActive').checked = user.is_active !== false;
-    userModal.show();
+
+    showModal('userModal');
   } catch (err) {
     showToast('Erro ao carregar usuário: ' + err.message, 'danger');
   }
@@ -125,12 +159,19 @@ async function openEditUser(id) {
 
 async function handleSaveUser(e) {
   e.preventDefault();
+  setModalAlert('userModalAlert', '');
+
   const id = document.getElementById('userId').value;
   const name = document.getElementById('userName').value.trim();
   const email = document.getElementById('userEmail').value.trim();
   const password = document.getElementById('userPassword').value;
   const role = document.getElementById('userRole').value;
   const is_active = document.getElementById('userActive').checked;
+
+  if (!name || !email) {
+    setModalAlert('userModalAlert', 'Nome e e-mail são obrigatórios.');
+    return;
+  }
 
   const payload = {
     name,
@@ -165,9 +206,10 @@ async function handleSaveUser(e) {
       showToast('Usuário cadastrado com sucesso!', 'success');
     }
 
-    userModal.hide();
+    hideModal('userModal');
     loadUsers();
   } catch (err) {
+    setModalAlert('userModalAlert', err.message);
     showToast(err.message, 'danger');
   } finally {
     submitBtn.disabled = false;
@@ -175,15 +217,23 @@ async function handleSaveUser(e) {
   }
 }
 
-function openDeleteUser(id, name) {
+function openDeleteUser(id) {
   userToDeleteId = id;
-  document.getElementById('deleteUserName').textContent = name;
-  deleteUserModal.show();
+  setModalAlert('deleteUserAlert', '');
+
+  const user = usersMap.get(id);
+  const name = user ? user.name : `#${id}`;
+
+  const nameEl = document.getElementById('deleteUserName');
+  if (nameEl) nameEl.textContent = name;
+
+  showModal('deleteUserConfirmModal');
 }
 
 async function handleConfirmDeleteUser() {
   if (!userToDeleteId) return;
 
+  setModalAlert('deleteUserAlert', '');
   const btn = document.getElementById('btnConfirmDeleteUser');
   btn.disabled = true;
   btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Excluindo...';
@@ -194,14 +244,15 @@ async function handleConfirmDeleteUser() {
     });
 
     showToast('Usuário excluído com sucesso.', 'success');
-    deleteUserModal.hide();
+    hideModal('deleteUserConfirmModal');
+    userToDeleteId = null;
     loadUsers();
   } catch (err) {
+    setModalAlert('deleteUserAlert', err.message);
     showToast(err.message, 'danger');
   } finally {
     btn.disabled = false;
     btn.innerHTML = 'Excluir Usuário';
-    userToDeleteId = null;
   }
 }
 
@@ -215,3 +266,6 @@ function escapeHtml(str) {
     .replace(/'/g, '&#039;');
 }
 
+window.openCreateUser = openCreateUser;
+window.openEditUser = openEditUser;
+window.openDeleteUser = openDeleteUser;

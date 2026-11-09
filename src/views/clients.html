@@ -143,6 +143,7 @@
             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
           </div>
           <div class="modal-body">
+            <div id="clientModalAlert" class="alert alert-danger d-none py-2 px-3 small mb-3"></div>
             <input type="hidden" id="clientId">
 
             <div class="mb-3">
@@ -199,6 +200,7 @@
             <i class="bi bi-shield-exclamation me-1"></i>
             Por segurança, clientes com tarefas vinculadas não poderão ser excluídos.
           </div>
+          <div id="deleteClientAlert" class="alert alert-danger d-none py-2 px-3 small mt-3"></div>
         </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>

@@ -2,17 +2,13 @@
  * Mini Gestão - Gerenciamento de Tarefas
  */
 
-let taskModal;
-let deleteTaskModal;
+const tasksMap = new Map();
 let taskToDeleteId = null;
 
 let allClientsList = [];
 let allUsersList = [];
 
 document.addEventListener('DOMContentLoaded', () => {
-  taskModal = new bootstrap.Modal(document.getElementById('taskModal'));
-  deleteTaskModal = new bootstrap.Modal(document.getElementById('deleteTaskConfirmModal'));
-
   // Carregar dados de apoio (clientes e usuários para selects)
   initAuxiliaryData().then(() => {
     loadTasks();
@@ -27,31 +23,59 @@ document.addEventListener('DOMContentLoaded', () => {
   const endDateFilter = document.getElementById('filterTaskEndDate');
 
   let debounceTimer;
-  searchInput.addEventListener('input', () => {
-    clearTimeout(debounceTimer);
-    debounceTimer = setTimeout(() => loadTasks(), 300);
-  });
+  if (searchInput) {
+    searchInput.addEventListener('input', () => {
+      clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => loadTasks(), 300);
+    });
+  }
 
   [clientFilter, userFilter, statusFilter, startDateFilter, endDateFilter].forEach((input) => {
-    input.addEventListener('change', () => loadTasks());
+    if (input) {
+      input.addEventListener('change', () => loadTasks());
+    }
   });
 
   // Formulário de Criação/Edição
-  document.getElementById('taskForm').addEventListener('submit', handleSaveTask);
+  const taskForm = document.getElementById('taskForm');
+  if (taskForm) {
+    taskForm.addEventListener('submit', handleSaveTask);
+  }
 
   // Confirmação de exclusão
-  document.getElementById('btnConfirmDeleteTask').addEventListener('click', handleConfirmDeleteTask);
+  const btnConfirmDeleteTask = document.getElementById('btnConfirmDeleteTask');
+  if (btnConfirmDeleteTask) {
+    btnConfirmDeleteTask.addEventListener('click', handleConfirmDeleteTask);
+  }
+
+  // Delegação de Eventos na Tabela
+  const tbody = document.getElementById('tasksTableBody');
+  if (tbody) {
+    tbody.addEventListener('click', (e) => {
+      const btn = e.target.closest('button');
+      if (!btn) return;
+
+      const action = btn.dataset.action;
+      const id = parseInt(btn.dataset.id, 10);
+
+      if (action === 'edit' && id) {
+        openEditTask(id);
+      } else if (action === 'delete' && id) {
+        openDeleteTask(id);
+      }
+    });
+  }
 });
 
 async function initAuxiliaryData() {
   try {
     const [clients, users] = await Promise.all([
-      fetchApi('/api/clients'),
-      fetchApi('/api/users').catch(() => []), // Se o usuário não for admin, /api/users pode retornar 403
+      fetchApi('/api/clients').catch(() => []),
+      fetchApi('/api/users').catch(() => []),
     ]);
 
-    allClientsList = clients;
-    allUsersList = users;
+    allClientsList = Array.isArray(clients) ? clients : [];
+    allUsersList = Array.isArray(users) ? users : [];
 
     populateSelects();
   } catch (err) {
@@ -68,8 +92,12 @@ function populateSelects() {
     .map((c) => `<option value="${c.id}">${escapeHtml(c.name)}</option>`)
     .join('');
 
-  filterClient.innerHTML = '<option value="all">Todos os clientes</option>' + clientOptions;
-  modalClient.innerHTML = '<option value="">Selecione um cliente...</option>' + clientOptions;
+  if (filterClient) {
+    filterClient.innerHTML = '<option value="all">Todos os clientes</option>' + clientOptions;
+  }
+  if (modalClient) {
+    modalClient.innerHTML = '<option value="">Selecione um cliente...</option>' + clientOptions;
+  }
 
   // Select de Responsáveis no Filtro e no Modal
   const filterUser = document.getElementById('filterTaskUser');
@@ -79,19 +107,32 @@ function populateSelects() {
     .map((u) => `<option value="${u.id}">${escapeHtml(u.name)}</option>`)
     .join('');
 
-  filterUser.innerHTML = '<option value="all">Todos os responsáveis</option>' + userOptions;
-  modalUser.innerHTML = '<option value="">Nenhum (não atribuído)</option>' + userOptions;
+  if (filterUser) {
+    filterUser.innerHTML = '<option value="all">Todos os responsáveis</option>' + userOptions;
+  }
+  if (modalUser) {
+    modalUser.innerHTML = '<option value="">Nenhum (não atribuído)</option>' + userOptions;
+  }
 }
 
 async function loadTasks() {
-  const search = document.getElementById('searchTaskInput').value.trim();
-  const client_id = document.getElementById('filterTaskClient').value;
-  const user_id = document.getElementById('filterTaskUser').value;
-  const status = document.getElementById('filterTaskStatus').value;
-  const start_date = document.getElementById('filterTaskStartDate').value;
-  const end_date = document.getElementById('filterTaskEndDate').value;
+  const searchInput = document.getElementById('searchTaskInput');
+  const clientFilter = document.getElementById('filterTaskClient');
+  const userFilter = document.getElementById('filterTaskUser');
+  const statusFilter = document.getElementById('filterTaskStatus');
+  const startDateFilter = document.getElementById('filterTaskStartDate');
+  const endDateFilter = document.getElementById('filterTaskEndDate');
+
+  const search = searchInput ? searchInput.value.trim() : '';
+  const client_id = clientFilter ? clientFilter.value : 'all';
+  const user_id = userFilter ? userFilter.value : 'all';
+  const status = statusFilter ? statusFilter.value : 'all';
+  const start_date = startDateFilter ? startDateFilter.value : '';
+  const end_date = endDateFilter ? endDateFilter.value : '';
 
   const tbody = document.getElementById('tasksTableBody');
+  if (!tbody) return;
+
   tbody.innerHTML = `
     <tr>
       <td colspan="7" class="text-center py-4 text-muted">
@@ -111,8 +152,9 @@ async function loadTasks() {
     if (end_date) params.append('end_date', end_date);
 
     const tasks = await fetchApi(`/api/tasks?${params.toString()}`);
+    tasksMap.clear();
 
-    if (tasks.length === 0) {
+    if (!Array.isArray(tasks) || tasks.length === 0) {
       tbody.innerHTML = `
         <tr>
           <td colspan="7" class="text-center py-4 text-muted">
@@ -123,6 +165,8 @@ async function loadTasks() {
       `;
       return;
     }
+
+    tasks.forEach((t) => tasksMap.set(t.id, t));
 
     tbody.innerHTML = tasks
       .map(
@@ -138,11 +182,11 @@ async function loadTasks() {
         <td>${formatDate(t.due_date)}</td>
         <td class="text-muted small">${formatDateTime(t.created_at)}</td>
         <td class="text-end">
-          <button class="btn btn-sm btn-outline-primary me-1" onclick="openEditTask(${t.id})" title="Editar">
-            <i class="bi bi-pencil"></i>
+          <button type="button" class="btn btn-sm btn-outline-primary me-1" data-action="edit" data-id="${t.id}" title="Editar">
+            <i class="bi bi-pencil pointer-events-none"></i>
           </button>
-          <button class="btn btn-sm btn-outline-danger" onclick="openDeleteTask(${t.id}, '${escapeHtml(t.title)}')" title="Excluir">
-            <i class="bi bi-trash"></i>
+          <button type="button" class="btn btn-sm btn-outline-danger" data-action="delete" data-id="${t.id}" title="Excluir">
+            <i class="bi bi-trash pointer-events-none"></i>
           </button>
         </td>
       </tr>
@@ -192,17 +236,32 @@ function formatDateTime(dateStr) {
   return d.toLocaleDateString('pt-BR');
 }
 
-function openCreateTask() {
+async function openCreateTask() {
+  setModalAlert('taskModalAlert', '');
+
+  if (allClientsList.length === 0) {
+    await initAuxiliaryData();
+  }
+
   document.getElementById('taskModalLabel').textContent = 'Nova Tarefa';
   document.getElementById('taskId').value = '';
   document.getElementById('taskForm').reset();
   document.getElementById('taskStatus').value = 'pending';
-  taskModal.show();
+  showModal('taskModal');
 }
 
 async function openEditTask(id) {
+  setModalAlert('taskModalAlert', '');
   try {
-    const task = await fetchApi(`/api/tasks/${id}`);
+    if (allClientsList.length === 0) {
+      await initAuxiliaryData();
+    }
+
+    let task = tasksMap.get(id);
+    if (!task) {
+      task = await fetchApi(`/api/tasks/${id}`);
+    }
+
     document.getElementById('taskModalLabel').textContent = 'Editar Tarefa';
     document.getElementById('taskId').value = task.id;
     document.getElementById('taskTitle').value = task.title || '';
@@ -211,7 +270,8 @@ async function openEditTask(id) {
     document.getElementById('taskUserId').value = task.user_id || '';
     document.getElementById('taskStatus').value = task.status || 'pending';
     document.getElementById('taskDueDate').value = task.due_date || '';
-    taskModal.show();
+
+    showModal('taskModal');
   } catch (err) {
     showToast('Erro ao obter detalhes da tarefa: ' + err.message, 'danger');
   }
@@ -219,6 +279,8 @@ async function openEditTask(id) {
 
 async function handleSaveTask(e) {
   e.preventDefault();
+  setModalAlert('taskModalAlert', '');
+
   const id = document.getElementById('taskId').value;
   const title = document.getElementById('taskTitle').value.trim();
   const description = document.getElementById('taskDescription').value.trim();
@@ -226,6 +288,16 @@ async function handleSaveTask(e) {
   const user_id = document.getElementById('taskUserId').value || null;
   const status = document.getElementById('taskStatus').value;
   const due_date = document.getElementById('taskDueDate').value || null;
+
+  if (!title) {
+    setModalAlert('taskModalAlert', 'O título da tarefa é obrigatório.');
+    return;
+  }
+
+  if (!client_id) {
+    setModalAlert('taskModalAlert', 'É necessário selecionar um cliente para a tarefa.');
+    return;
+  }
 
   const payload = {
     title,
@@ -255,9 +327,10 @@ async function handleSaveTask(e) {
       showToast('Tarefa cadastrada com sucesso!', 'success');
     }
 
-    taskModal.hide();
+    hideModal('taskModal');
     loadTasks();
   } catch (err) {
+    setModalAlert('taskModalAlert', err.message);
     showToast(err.message, 'danger');
   } finally {
     submitBtn.disabled = false;
@@ -265,15 +338,23 @@ async function handleSaveTask(e) {
   }
 }
 
-function openDeleteTask(id, title) {
+function openDeleteTask(id) {
   taskToDeleteId = id;
-  document.getElementById('deleteTaskTitle').textContent = title;
-  deleteTaskModal.show();
+  setModalAlert('deleteTaskAlert', '');
+
+  const task = tasksMap.get(id);
+  const title = task ? task.title : `#${id}`;
+
+  const titleEl = document.getElementById('deleteTaskTitle');
+  if (titleEl) titleEl.textContent = title;
+
+  showModal('deleteTaskConfirmModal');
 }
 
 async function handleConfirmDeleteTask() {
   if (!taskToDeleteId) return;
 
+  setModalAlert('deleteTaskAlert', '');
   const btn = document.getElementById('btnConfirmDeleteTask');
   btn.disabled = true;
   btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Excluindo...';
@@ -284,14 +365,15 @@ async function handleConfirmDeleteTask() {
     });
 
     showToast('Tarefa excluída com sucesso.', 'success');
-    deleteTaskModal.hide();
+    hideModal('deleteTaskConfirmModal');
+    taskToDeleteId = null;
     loadTasks();
   } catch (err) {
+    setModalAlert('deleteTaskAlert', err.message);
     showToast(err.message, 'danger');
   } finally {
     btn.disabled = false;
     btn.innerHTML = 'Excluir Tarefa';
-    taskToDeleteId = null;
   }
 }
 
@@ -305,3 +387,6 @@ function escapeHtml(str) {
     .replace(/'/g, '&#039;');
 }
 
+window.openCreateTask = openCreateTask;
+window.openEditTask = openEditTask;
+window.openDeleteTask = openDeleteTask;
