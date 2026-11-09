@@ -1,0 +1,52 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: mini_gestao_app
+    restart: unless-stopped
+    ports:
+      - "${APP_PORT:-3000}:3000"
+    environment:
+      - NODE_ENV=${NODE_ENV:-production}
+      - PORT=3000
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-app_user}:${POSTGRES_PASSWORD:-senha_segura_123}@database:5432/${POSTGRES_DB:-mini_gestao}
+      - SESSION_SECRET=${SESSION_SECRET:-chave_secreta_padrao_substitua_em_producao_928374}
+      - SESSION_MAX_AGE=${SESSION_MAX_AGE:-86400000}
+    depends_on:
+      database:
+        condition: service_healthy
+    networks:
+      - mini_gestao_net
+
+  database:
+    image: postgres:16-alpine
+    container_name: mini_gestao_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-app_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-senha_segura_123}
+      POSTGRES_DB: ${POSTGRES_DB:-mini_gestao}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-app_user} -d ${POSTGRES_DB:-mini_gestao}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+    # O banco não expõe portas publicamente para o host em produção
+    # Caso precise conectar externamente em ambiente de desenvolvimento local, descomente:
+    # ports:
+    #   - "5432:5432"
+    networks:
+      - mini_gestao_net
+
+volumes:
+  pgdata:
+    driver: local
+
+networks:
+  mini_gestao_net:
+    driver: bridge
