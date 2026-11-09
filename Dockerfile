@@ -24,3 +24,4 @@ EXPOSE 3000
 
 # Comando para inicializar o servidor
 CMD ["node", "src/server.js"]
+

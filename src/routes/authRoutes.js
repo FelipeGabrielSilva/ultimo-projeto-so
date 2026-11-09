@@ -18,3 +18,4 @@ router.post('/logout', authController.logout.bind(authController));
 router.get('/me', requireAuth, authController.me.bind(authController));
 
 module.exports = router;
+

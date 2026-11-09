@@ -74,3 +74,4 @@ VALUES
     (2, 2, 'Atualização de dados cadastrais', 'Verificar endereço atualizado e nova inscrição estadual do cliente.', 'pending', CURRENT_DATE + INTERVAL '5 days'),
     (3, 1, 'Auditoria de segurança', 'Análise de conformidade e integridade dos backups do banco de dados.', 'cancelled', CURRENT_DATE - INTERVAL '1 day')
 ON CONFLICT DO NOTHING;
+

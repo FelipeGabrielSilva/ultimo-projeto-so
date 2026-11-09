@@ -270,3 +270,4 @@ cat backup_arquivo.sql | docker exec -i mini_gestao_db psql -U app_user -d mini_
 - **Mitigação de Brute-Force:** Limite configurado de até 15 tentativas a cada 15 minutos na rota de login.
 - **Proteção de Cabeçalhos:** Middleware `helmet` ativo aplicando diretivas de segurança contra clickjacking, MIME sniffing e XSS.
 - **Integridade de Dados:** Validações de integridade no backend que impedem exclusão de registros com dependências ativas.
+
