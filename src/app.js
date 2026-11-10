@@ -1,13 +1,11 @@
 const path = require('path');
 const express = require('express');
-const session = require('express-session');
-const PgSession = require('connect-pg-simple')(session);
 const helmet = require('helmet');
 const morgan = require('morgan');
 require('dotenv').config();
 
 const { pool } = require('./config/database');
-const { requireAuth, requireAdmin, redirectIfAuthenticated } = require('./middleware/authMiddleware');
+const { requireAuth, requireAdmin } = require('./middleware/authMiddleware');
 const { notFoundHandler, errorHandler } = require('./middleware/errorMiddleware');
 
 const authRoutes = require('./routes/authRoutes');
@@ -20,7 +18,7 @@ const app = express();
 // Configurar trust proxy para ambiente com proxy reverso (Coolify / Traefik / Nginx)
 app.set('trust proxy', 1);
 
-// Cabeçalhos de segurança HTTP com Helmet configurado para suportar CDN do Bootstrap
+// Cabeçalhos de segurança HTTP com Helmet configurado para suportar CDN do Bootstrap e Chart.js
 app.use(
   helmet({
     contentSecurityPolicy: {
@@ -49,43 +47,18 @@ app.use(express.urlencoded({ extended: true }));
 // Servir arquivos estáticos (CSS, JS, Assets)
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Configuração de Sessão no PostgreSQL via connect-pg-simple
-app.use(
-  session({
-    store: new PgSession({
-      pool,
-      tableName: 'sessions',
-      createTableIfMissing: false, // Gerenciada pelo init.sql
-    }),
-    secret: process.env.SESSION_SECRET || 'chave_padrao_super_secreta_mini_gestao_2026',
-    resave: false,
-    saveUninitialized: false,
-    name: 'mini_gestao_sid',
-    cookie: {
-      httpOnly: true,
-      secure: process.env.COOKIE_SECURE === 'true',
-      sameSite: 'lax',
-      maxAge: Number(process.env.SESSION_MAX_AGE) || 86400000, // 24 horas padrão
-    },
-  })
-);
-
 // ==========================================
-// Rotas de Páginas HTML (Views)
+// Rotas de Páginas HTML (Views) - Acesso Direto
 // ==========================================
 const viewsPath = path.join(__dirname, 'views');
 
-// Rota raiz: redireciona para o painel se autenticado, ou para o login
+// Rota raiz e /login redirecionam diretamente para o dashboard
 app.get('/', (req, res) => {
-  if (req.session && req.session.user) {
-    return res.redirect('/dashboard');
-  }
-  return res.redirect('/login');
+  return res.redirect('/dashboard');
 });
 
-// Tela de Login
-app.get('/login', redirectIfAuthenticated, (req, res) => {
-  res.sendFile(path.join(viewsPath, 'login.html'));
+app.get('/login', (req, res) => {
+  return res.redirect('/dashboard');
 });
 
 // Tela do Dashboard
@@ -103,7 +76,7 @@ app.get('/tasks', requireAuth, (req, res) => {
   res.sendFile(path.join(viewsPath, 'tasks.html'));
 });
 
-// Tela de Usuários (restrita a Administradores)
+// Tela de Usuários
 app.get('/users', requireAuth, requireAdmin, (req, res) => {
   res.sendFile(path.join(viewsPath, 'users.html'));
 });
@@ -131,4 +104,3 @@ app.use(notFoundHandler);
 app.use(errorHandler);
 
 module.exports = app;
-

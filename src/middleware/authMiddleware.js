@@ -1,60 +1,36 @@
+const DEFAULT_USER = {
+  id: 1,
+  name: 'Administrador',
+  email: 'admin@minigestao.local',
+  role: 'admin',
+};
+
 /**
- * Middleware para verificar se o usuário está autenticado
+ * Middleware de contexto de usuário (acesso direto ao sistema sem login)
  */
 function requireAuth(req, res, next) {
-  if (req.session && req.session.user) {
-    return next();
-  }
-
-  // Se for requisição de API ou AJAX, retorna status 401 JSON
-  const isApi = req.originalUrl.startsWith('/api/') || 
-                req.xhr || 
-                (req.headers.accept && req.headers.accept.includes('application/json'));
-
-  if (isApi) {
-    return res.status(401).json({ error: 'Acesso não autorizado. Faça login para continuar.' });
-  }
-
-  // Se for navegação de página no navegador, redireciona para login
-  return res.redirect('/login');
+  req.currentUser = DEFAULT_USER;
+  return next();
 }
 
 /**
- * Middleware para verificar se o usuário é administrador
+ * Middleware de verificação de perfil (liberado para acesso direto)
  */
 function requireAdmin(req, res, next) {
-  if (!req.session || !req.session.user) {
-    const isApi = req.originalUrl.startsWith('/api/') || req.xhr;
-    if (isApi) {
-      return res.status(401).json({ error: 'Acesso não autorizado.' });
-    }
-    return res.redirect('/login');
-  }
-
-  if (req.session.user.role !== 'admin') {
-    const isApi = req.originalUrl.startsWith('/api/') || req.xhr;
-    if (isApi) {
-      return res.status(403).json({ error: 'Permissão negada. Apenas administradores podem executar esta ação.' });
-    }
-    return res.redirect('/dashboard?error=forbidden');
-  }
-
+  req.currentUser = req.currentUser || DEFAULT_USER;
   return next();
 }
 
 /**
- * Middleware para páginas públicas (como /login): redireciona se já estiver autenticado
+ * Redireciona diretamente para o painel principal
  */
 function redirectIfAuthenticated(req, res, next) {
-  if (req.session && req.session.user) {
-    return res.redirect('/dashboard');
-  }
-  return next();
+  return res.redirect('/dashboard');
 }
 
 module.exports = {
+  DEFAULT_USER,
   requireAuth,
   requireAdmin,
   redirectIfAuthenticated,
 };
-

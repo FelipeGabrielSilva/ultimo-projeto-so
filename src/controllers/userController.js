@@ -101,13 +101,14 @@ class UserController {
         return res.status(404).json({ error: 'Usuário não encontrado.' });
       }
 
-      // Prevenir que o usuário logado desative a si mesmo ou altere seu próprio perfil de admin
-      if (req.session.user && req.session.user.id === parseInt(id, 10)) {
+      // Prevenir que a conta principal padrão seja desativada ou perca privilégio de admin
+      const activeUserId = req.currentUser ? req.currentUser.id : 1;
+      if (activeUserId === parseInt(id, 10)) {
         if (role && role !== 'admin') {
-          return res.status(400).json({ error: 'Você não pode revogar seu próprio privilégio de administrador.' });
+          return res.status(400).json({ error: 'Não é possível revogar o privilégio de administrador do usuário principal.' });
         }
         if (is_active === false) {
-          return res.status(400).json({ error: 'Você não pode desativar sua própria conta.' });
+          return res.status(400).json({ error: 'Não é possível desativar o usuário principal.' });
         }
       }
 
@@ -163,9 +164,10 @@ class UserController {
     try {
       const { id } = req.params;
 
-      // Impedir auto-exclusão
-      if (req.session.user && req.session.user.id === parseInt(id, 10)) {
-        return res.status(400).json({ error: 'Você não pode excluir sua própria conta.' });
+      // Impedir exclusão do usuário principal ativo
+      const activeUserId = req.currentUser ? req.currentUser.id : 1;
+      if (activeUserId === parseInt(id, 10)) {
+        return res.status(400).json({ error: 'Não é possível excluir a conta principal ativa.' });
       }
 
       // Verificar se existe

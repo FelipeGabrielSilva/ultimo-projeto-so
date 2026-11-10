@@ -1,6 +1,13 @@
 /**
- * Mini Gestão - Utilitários de Autenticação e Interface
+ * Mini Gestão - Utilitários de Interface e Perfil do Sistema
  */
+
+window.CURRENT_USER = {
+  id: 1,
+  name: 'Administrador',
+  email: 'admin@minigestao.local',
+  role: 'admin',
+};
 
 // Helper para exibir notificações Toast do Bootstrap
 function showToast(message, type = 'success') {
@@ -51,7 +58,6 @@ function hideModal(modalId) {
   if (instance) {
     instance.hide();
   }
-  // Limpeza de segurança para evitar páginas travadas por backdrops órfãos
   setTimeout(() => {
     if (!document.querySelector('.modal.show')) {
       document.querySelectorAll('.modal-backdrop').forEach((b) => b.remove());
@@ -84,7 +90,7 @@ function setModalAlert(alertId, message) {
   }
 }
 
-// Wrapper centralizado de chamadas de API com tratamento de sessão
+// Wrapper centralizado de chamadas de API
 async function fetchApi(url, options = {}) {
   const defaultHeaders = {
     'Content-Type': 'application/json',
@@ -96,34 +102,22 @@ async function fetchApi(url, options = {}) {
     ...options.headers,
   };
 
-  try {
-    const response = await fetch(url, options);
+  const response = await fetch(url, options);
+  const data = await response.json().catch(() => ({}));
 
-    // Se a sessão expirou ou não está autenticado
-    if (response.status === 401 && !window.location.pathname.includes('/login')) {
-      window.location.href = '/login?expired=1';
-      throw new Error('Sessão expirada. Faça login novamente.');
-    }
-
-    const data = await response.json().catch(() => ({}));
-
-    if (!response.ok) {
-      throw new Error(data.error || `Erro HTTP ${response.status}`);
-    }
-
-    return data;
-  } catch (err) {
-    throw err;
+  if (!response.ok) {
+    throw new Error(data.error || `Erro HTTP ${response.status}`);
   }
+
+  return data;
 }
 
-// Carregar informações do usuário logado na interface
+// Carregar informações do usuário padrão na interface
 async function initCurrentUser() {
   try {
     const data = await fetchApi('/api/auth/me');
     const user = data.user;
 
-    // Atualiza nome e papel
     const userNameElements = document.querySelectorAll('.current-user-name');
     userNameElements.forEach((el) => (el.textContent = user.name));
 
@@ -136,7 +130,6 @@ async function initCurrentUser() {
       el.className = `badge ${user.role === 'admin' ? 'bg-danger' : 'bg-secondary'}`;
     });
 
-    // Iniciais para avatar
     const initials = user.name
       .split(' ')
       .slice(0, 2)
@@ -145,19 +138,14 @@ async function initCurrentUser() {
       .toUpperCase();
 
     const avatarElements = document.querySelectorAll('.avatar-circle');
-    avatarElements.forEach((el) => (el.textContent = initials || 'U'));
+    avatarElements.forEach((el) => (el.textContent = initials || 'A'));
 
-    // Exibir menus restritos caso seja admin
-    if (user.role === 'admin') {
-      document.querySelectorAll('.admin-only').forEach((el) => el.classList.remove('d-none'));
-    } else {
-      document.querySelectorAll('.admin-only').forEach((el) => el.classList.add('d-none'));
-    }
+    document.querySelectorAll('.admin-only').forEach((el) => el.classList.remove('d-none'));
 
     window.CURRENT_USER = user;
     ensureProfileModal();
   } catch (err) {
-    console.warn('Não foi possível obter usuário atual:', err.message);
+    console.warn('Não foi possível obter perfil do usuário:', err.message);
   }
 }
 
@@ -218,9 +206,9 @@ function ensureProfileModal() {
 
   document.getElementById('profileForm').addEventListener('submit', handleSaveProfile);
 
-  // Vincular clique no perfil do usuário na sidebar
   document.querySelectorAll('.user-profile').forEach((el) => {
     el.setAttribute('title', 'Clique para editar seu perfil');
+    el.style.cursor = 'pointer';
     el.addEventListener('click', openProfileModal);
   });
 }
@@ -267,7 +255,6 @@ async function handleSaveProfile(e) {
     showToast('Perfil atualizado com sucesso!', 'success');
     hideModal('profileModal');
 
-    // Atualiza nome e avatar na interface
     if (res.user) {
       window.CURRENT_USER.name = res.user.name;
       document.querySelectorAll('.current-user-name').forEach((el) => (el.textContent = res.user.name));
@@ -277,7 +264,7 @@ async function handleSaveProfile(e) {
         .map((n) => n[0])
         .join('')
         .toUpperCase();
-      document.querySelectorAll('.avatar-circle').forEach((el) => (el.textContent = initials || 'U'));
+      document.querySelectorAll('.avatar-circle').forEach((el) => (el.textContent = initials || 'A'));
     }
   } catch (err) {
     setModalAlert('profileModalAlert', err.message);
@@ -288,29 +275,8 @@ async function handleSaveProfile(e) {
   }
 }
 
-// Ação de Logout
-async function handleLogout() {
-  try {
-    await fetchApi('/api/auth/logout', { method: 'POST' });
-    window.location.href = '/login';
-  } catch (err) {
-    console.error('Erro ao efetuar logout:', err);
-    window.location.href = '/login';
-  }
-}
-
 // Inicializações de layout e eventos
 document.addEventListener('DOMContentLoaded', () => {
-  // Configurar botão de logout se existir
-  const logoutBtns = document.querySelectorAll('.btn-logout');
-  logoutBtns.forEach((btn) => {
-    btn.addEventListener('click', (e) => {
-      e.preventDefault();
-      handleLogout();
-    });
-  });
-
-  // Configurar toggle de menu mobile
   const sidebarToggle = document.getElementById('sidebarToggle');
   const sidebar = document.querySelector('.sidebar');
   const backdrop = document.querySelector('.sidebar-backdrop');
@@ -329,42 +295,5 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // Carrega usuário caso não esteja na tela de login
-  if (!window.location.pathname.includes('/login')) {
-    initCurrentUser();
-  }
-
-  // Configura submit da tela de login caso exista o formulário
-  const loginForm = document.getElementById('loginForm');
-  if (loginForm) {
-    loginForm.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const email = document.getElementById('email').value;
-      const password = document.getElementById('password').value;
-      const errorAlert = document.getElementById('loginAlert');
-      const submitBtn = loginForm.querySelector('button[type="submit"]');
-
-      if (errorAlert) errorAlert.classList.add('d-none');
-      submitBtn.disabled = true;
-      submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Entrando...';
-
-      try {
-        await fetchApi('/api/auth/login', {
-          method: 'POST',
-          body: JSON.stringify({ email, password }),
-        });
-
-        window.location.href = '/dashboard';
-      } catch (err) {
-        if (errorAlert) {
-          errorAlert.textContent = err.message || 'Erro ao realizar login.';
-          errorAlert.classList.remove('d-none');
-        }
-      } finally {
-        submitBtn.disabled = false;
-        submitBtn.innerHTML = '<i class="bi bi-box-arrow-in-right me-2"></i>Entrar';
-      }
-    });
-  }
+  initCurrentUser();
 });
-

@@ -12,13 +12,13 @@
 O **Mini Gestão** é um sistema web intuitivo e completo para administração de clientes e controle de tarefas operacionais. Desenvolvido com foco em simplicidade arquitetural, segurança, manutenibilidade e facilidade de publicação em servidores através de containers Docker e orquestração pelo Coolify.
 
 ### Principais Recursos
-- **Autenticação Segura:** Login/Logout com proteção contra ataques de força bruta (rate limiting), senhas protegidas com bcrypt e sessões salvas no PostgreSQL (`connect-pg-simple`).
-- **Controle de Acesso por Perfil:** Administradores possuem controle total (incluindo gestão de usuários); Operadores gerenciam clientes e tarefas.
-- **Gestão de Clientes:** Cadastro, edição, listagem com pesquisa em tempo real (nome, CPF/CNPJ, e-mail) e filtros por situação.
+- **Acesso Direto ao Sistema:** Abertura imediata no Painel de Indicadores (Dashboard) sem necessidade de tela de login.
+- **Gestão de Usuários:** Cadastro, edição e gerenciamento de contas de usuários e perfis para atribuição nas tarefas.
+- **Gestão de Clientes:** Cadastro, edição, listagem com pesquisa em tempo real (nome, CPF/CNPJ, e-mail), filtros por situação e exportação em CSV.
 - **Segurança de Integridade Relacional:** Bloqueio inteligente de exclusão de clientes com tarefas pendentes ou vinculadas.
-- **Gestão de Tarefas:** Criação, edição, prazos, atribuição de usuários responsáveis e múltiplos status (*Pendente*, *Em Andamento*, *Concluída*, *Cancelada*).
+- **Gestão de Tarefas:** Criação, edição, prazos, atribuição de usuários responsáveis, múltiplos status (*Pendente*, *Em Andamento*, *Concluída*, *Cancelada*) e exportação em CSV.
 - **Filtros Avançados:** Filtragem de tarefas por cliente, responsável, situação e intervalos de datas.
-- **Painel de Indicadores (Dashboard):** Contadores rápidos em tempo real, lista de últimas tarefas e alertas com contagem regressiva para tarefas próximas do vencimento ou atrasadas.
+- **Painel de Indicadores (Dashboard):** Contadores rápidos em tempo real, gráficos interativos (Chart.js), lista de últimas tarefas e alertas para tarefas próximas do vencimento ou atrasadas.
 - **Pronto para Produção:** Dockerfile leve em Alpine Linux, Docker Compose com healthcheck e volumes persistentes, e compatibilidade nativa com Coolify.
 
 ---
@@ -31,9 +31,8 @@ O **Mini Gestão** é um sistema web intuitivo e completo para administração d
 | **Estilização** | Bootstrap 5 + Bootstrap Icons | Componentes responsivos, modais, alertas e badges modernos |
 | **Backend** | Node.js (LTS) + Express | API REST ágil e entrega dos arquivos estáticos |
 | **Banco de Dados** | PostgreSQL 16 | Banco relacional robusto com integridade referencial |
-| **Sessões** | Express-Session + Connect-PG-Simple | Sessões autenticadas salvas na tabela `sessions` do PostgreSQL |
-| **Criptografia** | bcryptjs | Hashing de senhas com salt rounds |
-| **Segurança** | Helmet + Express-Rate-Limit | Cabeçalhos de segurança HTTP e mitigação de ataques de força bruta |
+| **Criptografia** | bcryptjs | Hashing de senhas com salt rounds para cadastro de usuários |
+| **Segurança** | Helmet | Cabeçalhos de segurança HTTP e proteção contra XSS/Clickjacking |
 | **Containerização** | Docker & Docker Compose | Ambientes isolados para a aplicação e para o banco de dados |
 | **Deploy** | Coolify | Publicação simplificada com proxy reverso e SSL automático |
 
@@ -73,13 +72,12 @@ ultimo-projeto-so/
 │   │       └── users.js        # Gestão de usuários e permissões
 │   ├── views/
 │   │   ├── 404.html            # Página de erro amigável
-│   │   ├── login.html          # Tela de entrada
-│   │   ├── dashboard.html      # Painel de controle e estatísticas
+│   │   ├── dashboard.html      # Painel de controle, gráficos e estatísticas
 │   │   ├── clients.html        # Tela de clientes
 │   │   ├── tasks.html          # Tela de tarefas
-│   │   └── users.html          # Tela de usuários (Admin)
-│   ├── app.js                  # Configuração do Express, sessões e middlewares
-│   └── server.js               # Inicialização com teste de banco e graceful shutdown
+│   │   └── users.html          # Tela de usuários
+│   ├── app.js                  # Configuração do Express e middlewares
+│   └── server.js               # Inicialização com retry no banco e auto-migração
 │
 ├── database/
 │   └── init.sql                # Criação das tabelas, índices e dados iniciais (Seed)
@@ -112,19 +110,12 @@ O Docker Compose irá:
 4. Construir e inicializar o container da aplicação (`mini_gestao_app`).
 
 ### 2. Acessar o sistema
-Abra no navegador:
+Abra no navegador (acesso direto ao Dashboard, sem necessidade de login):
 👉 **[http://localhost:3333](http://localhost:3333)**
 
 *(Portas configuradas: **3333** para a aplicação web e **5433** para acesso externo ao banco PostgreSQL).*
 
-### 3. Credenciais de Acesso Padrão
-
-| Perfil | E-mail | Senha |
-|---|---|---|
-| **Administrador** | `admin@minigestao.local` | `admin123` |
-| **Operador Padrão** | `operador@minigestao.local` | `admin123` |
-
-### 4. Parar a aplicação
+### 3. Parar a aplicação
 ```bash
 docker compose down
 ```
@@ -158,40 +149,39 @@ docker compose down
 
 ## 6. Endpoints da API REST
 
-### Autenticação (`/api/auth`)
+### Perfil Ativo (`/api/auth`)
 | Método | Endpoint | Acesso | Descrição |
 |---|---|---|---|
-| `POST` | `/api/auth/login` | Público | Autentica e inicia sessão no PostgreSQL |
-| `POST` | `/api/auth/logout` | Autenticado | Encerra sessão e remove cookie |
-| `GET` | `/api/auth/me` | Autenticado | Retorna dados do usuário conectado |
+| `GET` | `/api/auth/me` | Direto | Retorna dados do usuário padrão ativo |
+| `PUT` | `/api/auth/profile` | Direto | Atualiza nome ou senha do perfil ativo |
 
 ### Clientes (`/api/clients`)
 | Método | Endpoint | Acesso | Descrição |
 |---|---|---|---|
-| `GET` | `/api/clients` | Autenticado | Lista clientes (filtros: `search`, `status`) |
-| `POST` | `/api/clients` | Autenticado | Cria novo cliente |
-| `GET` | `/api/clients/:id` | Autenticado | Detalhes do cliente e suas tarefas vinculadas |
-| `PUT` | `/api/clients/:id` | Autenticado | Atualiza dados do cliente |
-| `DELETE` | `/api/clients/:id` | Autenticado | Exclui cliente (bloqueia se houver tarefas) |
+| `GET` | `/api/clients` | Direto | Lista clientes (filtros: `search`, `status`) |
+| `POST` | `/api/clients` | Direto | Cria novo cliente |
+| `GET` | `/api/clients/:id` | Direto | Detalhes do cliente e suas tarefas vinculadas |
+| `PUT` | `/api/clients/:id` | Direto | Atualiza dados do cliente |
+| `DELETE` | `/api/clients/:id` | Direto | Exclui cliente (bloqueia se houver tarefas) |
 
 ### Tarefas (`/api/tasks`)
 | Método | Endpoint | Acesso | Descrição |
 |---|---|---|---|
-| `GET` | `/api/tasks/dashboard-stats` | Autenticado | Totais, últimas tarefas e próximas do vencimento |
-| `GET` | `/api/tasks` | Autenticado | Lista tarefas com múltiplos filtros |
-| `POST` | `/api/tasks` | Autenticado | Cria nova tarefa |
-| `GET` | `/api/tasks/:id` | Autenticado | Detalhes da tarefa |
-| `PUT` | `/api/tasks/:id` | Autenticado | Atualiza tarefa |
-| `DELETE` | `/api/tasks/:id` | Autenticado | Exclui tarefa |
+| `GET` | `/api/tasks/dashboard-stats` | Direto | Totais, últimas tarefas e próximas do vencimento |
+| `GET` | `/api/tasks` | Direto | Lista tarefas com múltiplos filtros |
+| `POST` | `/api/tasks` | Direto | Cria nova tarefa |
+| `GET` | `/api/tasks/:id` | Direto | Detalhes da tarefa |
+| `PUT` | `/api/tasks/:id` | Direto | Atualiza tarefa |
+| `DELETE` | `/api/tasks/:id` | Direto | Exclui tarefa |
 
 ### Usuários (`/api/users`)
 | Método | Endpoint | Acesso | Descrição |
 |---|---|---|---|
-| `GET` | `/api/users` | Admin | Lista todos os usuários cadastrados |
-| `POST` | `/api/users` | Admin | Cadastra novo usuário com senha criptografada |
-| `GET` | `/api/users/:id` | Admin | Detalhes do usuário |
-| `PUT` | `/api/users/:id` | Admin | Altera nome, e-mail, perfil, status ou senha |
-| `DELETE` | `/api/users/:id` | Admin | Exclui usuário (impede auto-exclusão) |
+| `GET` | `/api/users` | Direto | Lista todos os usuários cadastrados |
+| `POST` | `/api/users` | Direto | Cadastra novo usuário com senha criptografada |
+| `GET` | `/api/users/:id` | Direto | Detalhes do usuário |
+| `PUT` | `/api/users/:id` | Direto | Altera nome, e-mail, perfil, status ou senha |
+| `DELETE` | `/api/users/:id` | Direto | Exclui usuário (protege conta principal ativa) |
 
 ---
 
@@ -243,8 +233,7 @@ COOKIE_SECURE=true
 ### Passo 5: Executar o Deploy
 1. Clique no botão **Deploy**.
 2. Acompanhe os logs da compilação e inicialização.
-3. Acesse seu domínio configurado e realize o primeiro login com o usuário administrador padrão.
-4. **Recomendação de segurança imediata:** Acesse a tela de **Usuários** e altere a senha do usuário `admin@minigestao.local`.
+3. Acesse seu domínio configurado — o sistema abrirá diretamente no Dashboard.
 
 ---
 
@@ -269,9 +258,7 @@ cat backup_arquivo.sql | docker exec -i mini_gestao_db psql -U app_user -d mini_
 ## 9. Práticas de Segurança Aplicadas
 
 - **Proteção contra SQL Injection:** 100% das consultas utilizam parâmetros nomeados (`$1, $2, ...`) do driver oficial `pg`.
-- **Criptografia Forte:** Senhas nunca são gravadas em texto puro, utilizando o algoritmo `bcrypt` com salt rounds.
-- **Sessões no Servidor:** Cookies contêm apenas o identificador da sessão (`sid`), protegidos por `HttpOnly` e política `SameSite=Lax`.
-- **Mitigação de Brute-Force:** Limite configurado de até 15 tentativas a cada 15 minutos na rota de login.
+- **Criptografia Forte:** Senhas de usuários nunca são gravadas em texto puro, utilizando o algoritmo `bcrypt` com salt rounds.
 - **Proteção de Cabeçalhos:** Middleware `helmet` ativo aplicando diretivas de segurança contra clickjacking, MIME sniffing e XSS.
 - **Integridade de Dados:** Validações de integridade no backend que impedem exclusão de registros com dependências ativas.
 
